@@ -14,8 +14,8 @@ supported_apps:
     - name : Adobe After Effects
       image : images/supported_apps/ae.png
       categories : ["2D", "Compositing", "Animation"]
-      content : Plugin required.
-      link : "http://fnordware.blogspot.com/2012/05/opencolorio-for-after-effects.html"
+      content : Native support.
+      link : "https://helpx.adobe.com/after-effects/using/opencolorio-aces-color-management.html"
     
     # portfolio item loop
     - name : Anchorpoint
@@ -58,6 +58,13 @@ supported_apps:
       categories : ["Game Engine", "3D"]
       content : Version 3 and up.
       link : "https://www.cryengine.com/"
+      
+    # portfolio item loop
+    - name : Disguise
+      image : images/supported_apps/disguise.png
+      categories : ["2D", "3D", "Compositing", "Playback", "Simulation"]
+      content : Designer r29.1 and up.
+      link : "https://disguise.one/"
 
     # portfolio item loop
     - name : DJV
@@ -161,8 +168,8 @@ supported_apps:
     - name : Adobe Photoshop
       image : images/supported_apps/ps.png
       categories : ["2D", "Photography", "Paint"]
-      content : Plugin required.
-      link : "http://fnordware.blogspot.com/2017/02/opencolorio-for-photoshop.html"
+      content : Native support.
+      link : "https://helpx.adobe.com/photoshop/using/opencolorio-transform.html"
 
       # portfolio item loop
     - name : PhotoFlow
@@ -191,6 +198,13 @@ supported_apps:
       categories : ["2D", "Texture"]
       content : Version 2019.3 and up.
       link : "https://www.substance3d.com/products/substance-designer/"
+
+    # portfolio item loop
+    - name : TouchDesigner
+      image : images/supported_apps/touchdesigner.png
+      categories : ["2D", "3D", "Animation", "Compositing", "Editing", "Lighting", "Playback", "Render", "Simulation", "Texture", "Tracking"]
+      content : Native support.
+      link : "http://www.derivative.ca/"
 
     # portfolio item loop
     - name : Unreal Engine

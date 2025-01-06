@@ -18,7 +18,12 @@ if(OCIO_USE_SIMD)
 
     if (OCIO_USE_SSE2NEON AND COMPILER_SUPPORTS_ARM_NEON)
         include(CheckSupportSSEUsingSSE2NEON)
-        if(NOT COMPILER_SUPPORTS_SSE_WITH_SSE2NEON)
+        if(COMPILER_SUPPORTS_SSE_WITH_SSE2NEON)
+            if(WIN32 AND MSVC)
+                # Enable the "new" preprocessor, to more closely match Clang/GCC, required for sse2neon
+                set(PLATFORM_COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};/Zc:preprocessor")
+            endif()
+        else()
             set(OCIO_USE_SSE2NEON OFF)
         endif()
     endif()
@@ -62,6 +67,9 @@ if(USE_MSVC)
         )
     endif()
 
+    # Make MSVC compiler report correct __cplusplus version (otherwise reports 199711L)
+    set(PLATFORM_COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};/Zc:__cplusplus")
+
     # Explicitely specify the default warning level i.e. /W3.
     # Note: Do not use /Wall (i.e. /W4) which adds 'informational' warnings.
     set(PLATFORM_COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};/W3")
@@ -73,6 +81,9 @@ if(USE_MSVC)
     if(OCIO_WARNING_AS_ERROR)
         set(PLATFORM_COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};/WX")
     endif()
+
+    # Enable parallel compilation of source files
+    set(PLATFORM_COMPILE_OPTIONS "${PLATFORM_COMPILE_OPTIONS};/MP")
 
 elseif(USE_CLANG)
 

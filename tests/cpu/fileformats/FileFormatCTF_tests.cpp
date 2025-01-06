@@ -955,6 +955,41 @@ OCIO_ADD_TEST(FileFormatCTF, lut1d_inv)
     OCIO_CHECK_CLOSE(a2.getValues()[50], 1.0f, error);
 }
 
+OCIO_ADD_TEST(FileFormatCTF, lut1d_inv_scaling)
+{
+    // Validate that the InverseLUT1D array values are scaled based on inBitDepth.
+    // (The previous example had inBitDepth=32f, so it does not validate that.)
+
+    OCIO::LocalCachedFileRcPtr cachedFile;
+    const std::string ctfFile("lut1d_inverse_halfdom_slog_fclut.ctf");
+    OCIO_CHECK_NO_THROW(cachedFile = LoadCLFFile(ctfFile));
+    OCIO_REQUIRE_ASSERT((bool)cachedFile);
+
+    const OCIO::ConstOpDataVec & opList = cachedFile->m_transform->getOps();
+    OCIO_REQUIRE_EQUAL(opList.size(), 1);
+
+    auto pLut = std::dynamic_pointer_cast<const OCIO::Lut1DOpData>(opList[0]);
+    OCIO_REQUIRE_ASSERT(pLut);
+    // For an InverseLUT1D, the file "out" depth is actually taken from inBitDepth.
+    OCIO_CHECK_EQUAL(pLut->getFileOutputBitDepth(), OCIO::BIT_DEPTH_UINT16);
+    OCIO_CHECK_EQUAL(pLut->getDirection(), OCIO::TRANSFORM_DIR_INVERSE);
+
+    const OCIO::Array & a2 = pLut->getArray();
+    OCIO_CHECK_EQUAL(a2.getNumColorComponents(), 1);
+
+    OCIO_CHECK_EQUAL(a2.getLength(), 65536);
+    OCIO_CHECK_EQUAL(a2.getNumValues(),
+                     a2.getLength()*a2.getMaxColorComponents());
+
+    const float error = 1e-6f;
+    OCIO_REQUIRE_EQUAL(a2.getValues().size(), a2.getNumValues());
+
+    // Input value 17830 scaled by 65535.
+    OCIO_CHECK_CLOSE(a2.getValues()[0], 0.27206836f, error);
+    // Input value 55070 scaled by 65535.
+    OCIO_CHECK_CLOSE(a2.getValues()[31743 * 3], 0.84031434f, error);
+}
+
 namespace
 {
 OCIO::LocalCachedFileRcPtr ParseString(const std::string & str)
@@ -1056,7 +1091,9 @@ OCIO_ADD_TEST(FileFormatCTF, lut3d_inv)
     auto pLut = std::dynamic_pointer_cast<const OCIO::Lut3DOpData>(opList[0]);
     OCIO_REQUIRE_ASSERT(pLut);
 
+    // For an InverseLUT3D, the file "out" depth is set by the inBitDepth of the file.
     OCIO_CHECK_EQUAL(pLut->getFileOutputBitDepth(), OCIO::BIT_DEPTH_UINT12);
+
     OCIO_CHECK_EQUAL(pLut->getInterpolation(), OCIO::INTERP_TETRAHEDRAL);
     OCIO_CHECK_EQUAL(pLut->getDirection(), OCIO::TRANSFORM_DIR_INVERSE);
 
@@ -1067,6 +1104,7 @@ OCIO_ADD_TEST(FileFormatCTF, lut3d_inv)
                      *array.getLength()*array.getMaxColorComponents());
     OCIO_REQUIRE_EQUAL(array.getValues().size(), array.getNumValues());
 
+    // Validate that the array was scaled by the inBitDepth of the file.
     OCIO_CHECK_EQUAL(array.getLength(), 17);
     OCIO_CHECK_CLOSE(array.getValues()[0], 25.0f / 4095.0f, 1e-8f);
     OCIO_CHECK_CLOSE(array.getValues()[1], 30.0f / 4095.0f, 1e-8f);
@@ -3765,7 +3803,8 @@ void WriteGroupCLF(OCIO::ConstGroupTransformRcPtr group, std::ostringstream & ou
     group->write(cfg, OCIO::FILEFORMAT_CLF, outputTransform);
 }
 
-void ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::Style style, int lineNo)
+void ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::Style style,
+                                       const std::string & vers, int lineNo)
 {
     // Validate the load & save for any FixedFunction style without parameters.
 
@@ -3775,7 +3814,7 @@ void ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::Style style, i
 
     std::ostringstream strebuf;
     strebuf << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            << "<ProcessList version=\"2\" id=\"ABCD\">\n"
+            << "<ProcessList version=\"" << vers << "\" id=\"ABCD\">\n"
             << "    " << ffStr.str() << "\n"
             << "    </FixedFunction>\n"
             << "</ProcessList>\n";
@@ -3820,24 +3859,26 @@ void ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::Style style, i
 
 OCIO_ADD_TEST(FileFormatCTF, ff_load_save_ctf)
 {
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_03_FWD, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_03_INV, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_10_FWD, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_10_INV, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_03_FWD   , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_03_INV   , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_10_FWD   , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_10_INV   , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_DARK_TO_DIM_10_FWD, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_DARK_TO_DIM_10_INV, __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::RGB_TO_HSV         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::HSV_TO_RGB         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_xyY         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::xyY_TO_XYZ         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_uvY         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::uvY_TO_XYZ         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_LUV         , __LINE__);
-    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::LUV_TO_XYZ         , __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_03_FWD, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_03_INV, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_10_FWD, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_RED_MOD_10_INV, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_03_FWD   , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_03_INV   , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_10_FWD   , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_GLOW_10_INV   , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_DARK_TO_DIM_10_FWD, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::ACES_DARK_TO_DIM_10_INV, "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::RGB_TO_HSV         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::HSV_TO_RGB         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_xyY         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::xyY_TO_XYZ         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_uvY         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::uvY_TO_XYZ         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::XYZ_TO_LUV         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::LUV_TO_XYZ         , "2", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::PQ_TO_LIN          , "2.4", __LINE__);
+    ValidateFixedFunctionStyleNoParam(OCIO::FixedFunctionOpData::LIN_TO_PQ          , "2.4", __LINE__);
 }
 
 OCIO_ADD_TEST(FileFormatCTF, load_ff_fail_version)
@@ -6419,6 +6460,97 @@ OCIO_ADD_TEST(CTFTransform, fixed_function_rec2100_inverse_ctf)
     OCIO_CHECK_EQUAL(expected, outputTransform.str());
 }
 
+OCIO_ADD_TEST(CTFTransform, fixed_function_lin_to_gammalog_ctf)
+{
+    const double vals[10] = {0.0, 0.25, 0.5, 1.0, 0.0,
+                             2.718, 0.17883277, 0.807825590164, 1.0, -0.07116723};
+    OCIO::FixedFunctionTransformRcPtr ff =
+        OCIO::FixedFunctionTransform::Create(OCIO::FIXED_FUNCTION_LIN_TO_GAMMA_LOG, &vals[0], 10);
+
+    {
+        OCIO::GroupTransformRcPtr group = OCIO::GroupTransform::Create();
+        group->getFormatMetadata().addAttribute(OCIO::METADATA_ID, "UIDFF42");
+        group->appendTransform(ff);
+
+        std::ostringstream outputTransform;
+        OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
+
+        const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
+<ProcessList version="2.4" id="UIDFF42">
+    <FixedFunction inBitDepth="32f" outBitDepth="32f" style="Lin_TO_GammaLog" params="0 0.25 0.5 1 0 2.718 0.17883277 0.807825590164 1 -0.07116723">
+    </FixedFunction>
+</ProcessList>
+)" };
+
+        OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
+        OCIO_CHECK_EQUAL(expected, outputTransform.str());
+    }
+    {
+        ff->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+        OCIO::GroupTransformRcPtr group = OCIO::GroupTransform::Create();
+        group->getFormatMetadata().addAttribute(OCIO::METADATA_ID, "UIDFF42");
+        group->appendTransform(ff);
+
+        std::ostringstream outputTransform;
+        OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
+
+        const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
+<ProcessList version="2.4" id="UIDFF42">
+    <FixedFunction inBitDepth="32f" outBitDepth="32f" style="GammaLog_TO_Lin" params="0 0.25 0.5 1 0 2.718 0.17883277 0.807825590164 1 -0.07116723">
+    </FixedFunction>
+</ProcessList>
+)" };
+
+        OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
+        OCIO_CHECK_EQUAL(expected, outputTransform.str());
+    }
+}
+
+OCIO_ADD_TEST(CTFTransform, fixed_function_lin_to_doublelog_ctf)
+{
+    const double vals[13] = { 10.0, 0.25, 0.5, -1.0, 0.0, -1.0, 1.25, 1.0, 1.0, 1.0, 0.5, 1.0, 0.0 };
+    OCIO::FixedFunctionTransformRcPtr ff =
+        OCIO::FixedFunctionTransform::Create(OCIO::FIXED_FUNCTION_LIN_TO_DOUBLE_LOG, &vals[0], 13);
+
+    {
+        OCIO::GroupTransformRcPtr group = OCIO::GroupTransform::Create();
+        group->getFormatMetadata().addAttribute(OCIO::METADATA_ID, "UIDFF42");
+        group->appendTransform(ff);
+
+        std::ostringstream outputTransform;
+        OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
+
+        const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
+<ProcessList version="2.4" id="UIDFF42">
+    <FixedFunction inBitDepth="32f" outBitDepth="32f" style="Lin_TO_DoubleLog" params="10 0.25 0.5 -1 0 -1 1.25 1 1 1 0.5 1 0">
+    </FixedFunction>
+</ProcessList>
+)" };
+
+        OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
+        OCIO_CHECK_EQUAL(expected, outputTransform.str());
+    }
+    {
+        ff->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+        OCIO::GroupTransformRcPtr group = OCIO::GroupTransform::Create();
+        group->getFormatMetadata().addAttribute(OCIO::METADATA_ID, "UIDFF42");
+        group->appendTransform(ff);
+
+        std::ostringstream outputTransform;
+        OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
+
+        const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
+<ProcessList version="2.4" id="UIDFF42">
+    <FixedFunction inBitDepth="32f" outBitDepth="32f" style="DoubleLog_TO_Lin" params="10 0.25 0.5 -1 0 -1 1.25 1 1 1 0.5 1 0">
+    </FixedFunction>
+</ProcessList>
+)" };
+
+        OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
+        OCIO_CHECK_EQUAL(expected, outputTransform.str());
+    }
+}
+
 OCIO_ADD_TEST(CTFTransform, exposure_contrast_video_ctf)
 {
     OCIO::ExposureContrastTransformRcPtr ec = OCIO::ExposureContrastTransform::Create();
@@ -6934,8 +7066,23 @@ OCIO_ADD_TEST(CTFTransform, grading_rgbcurve_lin_ctf)
 </ProcessList>
 )" };
 
-        OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
-        OCIO_CHECK_EQUAL(expected, outputTransform.str());
+        const StringUtils::StringVec osvec  = StringUtils::SplitByLines(outputTransform.str());
+        const StringUtils::StringVec resvec = StringUtils::SplitByLines(expected);
+        OCIO_CHECK_EQUAL(osvec.size(), resvec.size());
+        for(unsigned int i = 0; i < resvec.size(); ++i)
+        {
+            if ( (i >= 5 && i <= 7) ||
+                 (i >= 12 && i <= 15) ||
+                 (i == 18))
+            {
+                OCIO_CHECK_STR_FLOAT_VEC_CLOSE(osvec[i], resvec[i], 1e-5f);
+            }
+            else
+            {
+                OCIO_CHECK_EQUAL(osvec[i], resvec[i]);
+            }
+
+        }
     }
 
     // All curves are default curves, no curve is saved.
@@ -7535,9 +7682,12 @@ OCIO_ADD_TEST(CTFTransform, lut1d_inverse_ctf)
     OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
 
     // Note the type of the node.
+    //
+    // For an InverseLUT1D, the scaling of array values is based on the inBitDepth.
+    //
     const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
 <ProcessList version="1.3" id="UIDLUT42">
-    <InverseLUT1D id="lut01" name="test-lut" inBitDepth="32f" outBitDepth="10i">
+    <InverseLUT1D id="lut01" name="test-lut" inBitDepth="10i" outBitDepth="32f">
         <Array dim="16 3">
    0    1    2
    3    4    5
@@ -7703,9 +7853,12 @@ OCIO_ADD_TEST(CTFTransform, lut3d_inverse_ctf)
     OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
 
     // Note the type of the node.
+    //
+    // For an InverseLUT3D, the scaling of array values is based on the inBitDepth.
+    //
     const std::string expected{ R"(<?xml version="1.0" encoding="UTF-8"?>
 <ProcessList version="1.6" id="UIDLUT42">
-    <InverseLUT3D id="lut01" name="test-lut3d" inBitDepth="32f" outBitDepth="10i">
+    <InverseLUT3D id="lut01" name="test-lut3d" inBitDepth="10i" outBitDepth="32f">
         <Array dim="3 3 3 3">
    0    1    2
    3    4    5
@@ -7837,38 +7990,79 @@ OCIO_ADD_TEST(CTFTransform, bitdepth_ctf)
     auto range = OCIO::RangeTransform::Create();
     range->setFileInputBitDepth(OCIO::BIT_DEPTH_F16);
     range->setFileOutputBitDepth(OCIO::BIT_DEPTH_UINT12);
-    range->setMinInValue(0.);
-    range->setMinOutValue(0.);
+    range->setMinInValue(0.1);
+    range->setMinOutValue(-0.1);
+    range->setMaxInValue(0.9);
+    range->setMaxOutValue(1.1);
+
+    auto log = OCIO::LogTransform::Create();
+
+    auto invlut = OCIO::Lut1DTransform::Create();
+    invlut->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+    invlut->setFileOutputBitDepth(OCIO::BIT_DEPTH_UINT16);
+    invlut->setLength(3);
 
     auto mat2 = OCIO::MatrixTransform::Create();
     mat2->setFileInputBitDepth(OCIO::BIT_DEPTH_UINT8);
     mat2->setFileOutputBitDepth(OCIO::BIT_DEPTH_UINT10);
-
-    auto log = OCIO::LogTransform::Create();
+    mat2->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
 
     OCIO::GroupTransformRcPtr group = OCIO::GroupTransform::Create();
     group->getFormatMetadata().addAttribute(OCIO::METADATA_ID, "UID42");
 
-    // First op keeps bit-depth
+    // Transforms are setup as follows:
+    //
+    // Matrix    fileIn =  8i, fileOut = 10i
+    // Lut1D                   fileOut = 10i
+    // Exponent
+    // Range     fileIn = 16f, fileOut = 12i
+    // Matrix    fileIn =  8i, fileOut = 10i
+    // Log
+    // InvLut1D                fileOut = 16i
+    // InvMatrix fileIn =  8i, fileOut = 10i
+    // InvLut1D                fileOut = 16i
+
+    // First op keeps its in & out bit-depth.
+    // <Matrix inBitDepth="8i" outBitDepth="10i">
     group->appendTransform(mat);
 
     // Previous op out bit-depth used for in bit-depth.
+    // <LUT1D inBitDepth="10i" outBitDepth="10i">
     group->appendTransform(lut);
 
     // Previous op out bit-depth used for in bit-depth.
     // And next op (range) in bit-depth used for out bit-depth.
+    // <Exponent inBitDepth="10i" outBitDepth="16f">
     group->appendTransform(exp);
 
     // In bit-depth preserved and has been used for out bit-depth of previous op.
     // Next op is a matrix, but current op is range, first op out bit-depth
-    // is preserved and used for next op in bit-depth.
+    // is preserved and overrides the next op's in in bit-depth.
+    // <Range inBitDepth="16f" outBitDepth="12i">
     group->appendTransform(range);
 
     // Previous op out bit-depth used for in bit-depth.
+    // <Matrix inBitDepth="12i" outBitDepth="10i">
+    group->appendTransform(mat);
+
+    // Previous op out bit-depth used for in bit-depth. Out depth is set by preference
+    // of the next op.
+    // <Log inBitDepth="10i" outBitDepth="16i">
+    group->appendTransform(log);
+
+    // Preferred in bit-depth is preserved. Out depth is set by the next op.
+    // <InverseLUT1D inBitDepth="16i" outBitDepth="32f">
+    group->appendTransform(invlut);
+
+    // Sets both its preferred in and out depth. Note that because the transform
+    // direction is inverse, the mapping of file depths is swapped.
+    // <Matrix inBitDepth="10i" outBitDepth="8i">
     group->appendTransform(mat2);
 
-    // Previous op out bit-depth used for in bit-depth.
-    group->appendTransform(log);
+    // This time it doesn't get its preferred in depth, since the previous op has priority.
+    // The array values are scaled accordingly.
+    // <InverseLUT1D inBitDepth="8i" outBitDepth="32f">
+    group->appendTransform(invlut);
 
     std::ostringstream outputTransform;
     OCIO_CHECK_NO_THROW(WriteGroupCTF(group, outputTransform));
@@ -7893,8 +8087,10 @@ OCIO_ADD_TEST(CTFTransform, bitdepth_ctf)
         <ExponentParams exponent="1" />
     </Exponent>
     <Range inBitDepth="16f" outBitDepth="12i">
-        <minInValue> 0 </minInValue>
-        <minOutValue> 0 </minOutValue>
+        <minInValue> 0.1 </minInValue>
+        <maxInValue> 0.9 </maxInValue>
+        <minOutValue> -409.5 </minOutValue>
+        <maxOutValue> 4504.5 </maxOutValue>
     </Range>
     <Matrix inBitDepth="12i" outBitDepth="10i">
         <Array dim="3 3">
@@ -7903,10 +8099,32 @@ OCIO_ADD_TEST(CTFTransform, bitdepth_ctf)
                   0                   0    0.24981684981685
         </Array>
     </Matrix>
-    <Log inBitDepth="10i" outBitDepth="32f" style="log2">
+    <Log inBitDepth="10i" outBitDepth="16i" style="log2">
     </Log>
+    <InverseLUT1D inBitDepth="16i" outBitDepth="10i">
+        <Array dim="3 1">
+    0
+32767.5
+  65535
+        </Array>
+    </InverseLUT1D>
+    <Matrix inBitDepth="10i" outBitDepth="8i">
+        <Array dim="3 3">
+  0.249266862170088                   0                   0
+                  0   0.249266862170088                   0
+                  0                   0   0.249266862170088
+        </Array>
+    </Matrix>
+    <InverseLUT1D inBitDepth="8i" outBitDepth="32f">
+        <Array dim="3 1">
+  0
+127.5
+  255
+        </Array>
+    </InverseLUT1D>
 </ProcessList>
 )" };
+
     OCIO_CHECK_EQUAL(expected.size(), outputTransform.str().size());
     OCIO_CHECK_EQUAL(expected, outputTransform.str());
 }
@@ -8326,8 +8544,23 @@ R"(<?xml version="1.0" encoding="UTF-8"?>
     </LUT3D>
 </ProcessList>
 )" };
-    OCIO_CHECK_EQUAL(expectedCLF.size(), output1.str().size());
-    OCIO_CHECK_EQUAL(expectedCLF, output1.str());
+
+    const StringUtils::StringVec osvec  = StringUtils::SplitByLines(output1.str());
+    const StringUtils::StringVec resvec = StringUtils::SplitByLines(expectedCLF);
+    OCIO_CHECK_EQUAL(osvec.size(), resvec.size());
+    for(unsigned int i = 0; i < resvec.size(); ++i)
+    {
+        if ( (i >= 10 && i <= 19) ||
+             (i >= 24 && i <= 31))
+        {
+            OCIO_CHECK_STR_FLOAT_VEC_CLOSE(osvec[i], resvec[i], 1e-5f);
+        }
+        else
+        {
+            OCIO_CHECK_EQUAL(osvec[i], resvec[i]);
+        }
+
+    }
 }
 
 OCIO_ADD_TEST(FileFormatCTF, lut_interpolation_option)

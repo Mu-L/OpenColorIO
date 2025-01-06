@@ -42,7 +42,7 @@ def cmake_find_package(package_name):
             cmakelist_path = os.path.join(tmpdir, "CMakeLists.txt")
             with open(cmakelist_path, "w") as f:
                 f.write("""
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.14)
 project(test LANGUAGES CXX)
 
 find_package({} REQUIRED)
@@ -212,6 +212,7 @@ setup(
             'ociocheck=PyOpenColorIO.command_line:main',
             'ociochecklut=PyOpenColorIO.command_line:main',
             'ocioconvert=PyOpenColorIO.command_line:main',
+            'ociocpuinfo=PyOpenColorIO.command_line:main',
             'ociodisplay=PyOpenColorIO.command_line:main',
             'ociolutimage=PyOpenColorIO.command_line:main',
             'ociomakeclf=PyOpenColorIO.command_line:main',
